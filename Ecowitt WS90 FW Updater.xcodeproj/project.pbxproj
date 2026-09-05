@@ -409,6 +409,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Ecowitt\\ WS90\\ FW\\ Updater",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "ws90.updater.Ecowitt-WS90-FW-Updater";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -441,6 +445,10 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Ecowitt\\ WS90\\ FW\\ Updater",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "ws90.updater.Ecowitt-WS90-FW-Updater";

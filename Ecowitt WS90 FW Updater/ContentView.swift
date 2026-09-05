@@ -12,6 +12,8 @@ struct ContentView: View {
     @State private var updater = DFUUpdater()
     @State private var firmwareURL: URL?
     @State private var showingFilePicker = false
+    @State private var showingCancelConfirmation = false
+    @AppStorage("verifyAfterUpdate") private var verifyAfterUpdate = true
 
     private var dfuFileType: UTType {
         UTType(filenameExtension: "dfu") ?? .data
@@ -37,6 +39,15 @@ struct ContentView: View {
                 firmwareURL = url
                 updater.resetPhase()
             }
+        }
+        .confirmationDialog("Stop the firmware update?",
+                            isPresented: $showingCancelConfirmation) {
+            Button("Stop Update", role: .destructive) {
+                updater.cancelFlash()
+            }
+            Button("Continue Updating", role: .cancel) {}
+        } message: {
+            Text("Interrupting an update can leave the station with incomplete firmware. You can recover by pressing RESET and updating again.")
         }
         .task {
             // Poll for the station while the app is open so the indicator
@@ -69,14 +80,22 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 statusRow(
                     ok: updater.dfuUtilPath != nil,
-                    okText: "dfu-util found at \(updater.dfuUtilPath ?? "")",
+                    okText: updater.usingBundledTool
+                        ? "Using the app's built-in dfu-util"
+                        : "dfu-util found at \(updater.dfuUtilPath ?? "")",
                     failText: "dfu-util not found — install it with:  brew install dfu-util"
                 )
                 statusRow(
                     ok: updater.deviceDetected,
-                    okText: "WS90 detected in DFU mode",
+                    okText: "WS90 detected in DFU mode — serial \(updater.deviceInfo?.serial ?? "")",
                     failText: "No WS90 detected — connect it with a USB data cable and press RESET (LED should flash rapidly)"
                 )
+                if let info = updater.deviceInfo, !info.flashLayout.isEmpty {
+                    Text(info.flashLayout)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 26)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)
@@ -85,21 +104,25 @@ struct ContentView: View {
 
     private var firmwareSection: some View {
         GroupBox("Firmware") {
-            HStack {
-                Image(systemName: "doc.badge.gearshape")
-                    .foregroundStyle(.secondary)
-                if let firmwareURL {
-                    Text(firmwareURL.lastPathComponent)
-                        .fontWeight(.medium)
-                } else {
-                    Text("No firmware file selected — click Choose… to pick a .dfu file")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "doc.badge.gearshape")
                         .foregroundStyle(.secondary)
+                    if let firmwareURL {
+                        Text(firmwareURL.lastPathComponent)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("No firmware file selected — click Choose… to pick a .dfu file")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Choose…") {
+                        showingFilePicker = true
+                    }
+                    .disabled(updater.isFlashing)
                 }
-                Spacer()
-                Button("Choose…") {
-                    showingFilePicker = true
-                }
-                .disabled(updater.isFlashing)
+                Toggle("Verify after update (read the flash back and compare)", isOn: $verifyAfterUpdate)
+                    .disabled(updater.isFlashing)
             }
             .padding(4)
         }
@@ -126,9 +149,8 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
-        case .success:
-            Label("Firmware updated successfully. Disconnect the USB cable, then press RESET on the station.",
-                  systemImage: "checkmark.circle.fill")
+        case .success(let message):
+            Label(message, systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .failure(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -140,7 +162,7 @@ struct ContentView: View {
         HStack {
             Button {
                 if let firmwareURL {
-                    updater.flash(firmware: firmwareURL)
+                    updater.flash(firmware: firmwareURL, verify: verifyAfterUpdate)
                 }
             } label: {
                 Label("Update Firmware", systemImage: "arrow.down.circle")
@@ -151,8 +173,8 @@ struct ContentView: View {
             .disabled(!readyToFlash)
 
             if updater.isFlashing {
-                Button("Cancel", role: .cancel) {
-                    updater.cancelFlash()
+                Button("Cancel") {
+                    showingCancelConfirmation = true
                 }
                 .controlSize(.large)
             }
