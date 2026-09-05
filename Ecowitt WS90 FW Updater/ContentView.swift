@@ -75,7 +75,7 @@ struct ContentView: View {
                 statusRow(
                     ok: updater.deviceDetected,
                     okText: "WS90 detected in DFU mode",
-                    failText: "No WS90 detected — connect the station to this Mac with a USB cable"
+                    failText: "No WS90 detected — connect it with a USB data cable and press RESET (LED should flash rapidly)"
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,7 +127,7 @@ struct ContentView: View {
                     .foregroundStyle(.orange)
             }
         case .success:
-            Label("Firmware updated successfully. You can disconnect the station.",
+            Label("Firmware updated successfully. Disconnect the USB cable, then press RESET on the station.",
                   systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .failure(let message):

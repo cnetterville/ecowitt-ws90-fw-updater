@@ -51,8 +51,8 @@ final class DFUUpdater {
         deviceDetected = output.contains("Found DFU: [\(Self.deviceID)]")
     }
 
-    /// Starts `dfu-util -a 0 -d 0483:df11 -D <firmware>` and streams its
-    /// output into `log`, `progressStage`, and `progressFraction`.
+    /// Starts `dfu-util -a 0 -d 0483:df11 -t 512 -D <firmware>` and streams
+    /// its output into `log`, `progressStage`, and `progressFraction`.
     /// The target addresses come from the DfuSe file itself.
     func flash(firmware: URL) {
         guard let dfuUtilPath, !isFlashing else { return }
@@ -63,7 +63,11 @@ final class DFUUpdater {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: dfuUtilPath)
-        process.arguments = ["-a", "0", "-d", Self.deviceID, "-D", firmware.path]
+        // -t 512 matches Ecowitt's official update guide; at the 1024-byte
+        // transfer size the device reports, the bootloader stalls during page
+        // erases and dfu-util fails with 'Error during special command
+        // "ERASE_PAGE"'.
+        process.arguments = ["-a", "0", "-d", Self.deviceID, "-t", "512", "-D", firmware.path]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -96,7 +100,7 @@ final class DFUUpdater {
                 progressFraction = 1.0
                 phase = .success
             } else {
-                phase = .failure("dfu-util exited with status \(process.terminationStatus). See the log below for details.")
+                phase = .failure("Update failed (dfu-util exited with status \(process.terminationStatus)). Press RESET on the station so its LED flashes rapidly, then try again. See the log below for details.")
             }
         }
     }
