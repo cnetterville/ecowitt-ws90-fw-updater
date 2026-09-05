@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var firmwareURL: URL?
     @State private var showingFilePicker = false
     @State private var showingCancelConfirmation = false
+    @State private var showingAcknowledgments = false
     @AppStorage("verifyAfterUpdate") private var verifyAfterUpdate = true
 
     private var dfuFileType: UTType {
@@ -49,6 +50,9 @@ struct ContentView: View {
         } message: {
             Text("Interrupting an update can leave the station with incomplete firmware. You can recover by pressing RESET and updating again.")
         }
+        .sheet(isPresented: $showingAcknowledgments) {
+            AcknowledgmentsView()
+        }
         .task {
             // Poll for the station while the app is open so the indicator
             // flips as soon as it is plugged in.
@@ -72,6 +76,11 @@ struct ContentView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
+            Button("Licenses…") {
+                showingAcknowledgments = true
+            }
+            .buttonStyle(.link)
         }
     }
 
@@ -204,6 +213,39 @@ struct ContentView: View {
                 .foregroundStyle(ok ? .primary : .secondary)
         }
         .font(.callout)
+    }
+}
+
+/// Shows the bundled third-party license texts (dfu-util and libusb).
+struct AcknowledgmentsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private var text: String {
+        guard let url = Bundle.main.url(forResource: "Acknowledgments", withExtension: "txt"),
+              let contents = try? String(contentsOf: url, encoding: .utf8) else {
+            return "The acknowledgments file is missing from the app bundle."
+        }
+        return contents
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Third-Party Licenses")
+                .font(.title3.bold())
+            ScrollView {
+                Text(text)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 560, height: 480)
     }
 }
 
