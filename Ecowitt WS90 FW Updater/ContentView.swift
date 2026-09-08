@@ -10,6 +10,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var updater = DFUUpdater()
+    @State private var downloader = FirmwareDownloader()
     @State private var firmwareURL: URL?
     @State private var showingFilePicker = false
     @State private var showingCancelConfirmation = false
@@ -130,10 +131,56 @@ struct ContentView: View {
                     }
                     .disabled(updater.isFlashing)
                 }
+                HStack(spacing: 8) {
+                    Button("Check Ecowitt for Latest") {
+                        Task { await downloader.check() }
+                    }
+                    .disabled(updater.isFlashing || downloader.isBusy)
+                    onlineFirmwareStatus
+                    Spacer()
+                }
                 Toggle("Verify after update (read the flash back and compare)", isOn: $verifyAfterUpdate)
                     .disabled(updater.isFlashing)
             }
             .padding(4)
+        }
+    }
+
+    @ViewBuilder
+    private var onlineFirmwareStatus: some View {
+        switch downloader.state {
+        case .idle:
+            EmptyView()
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+            Text("Checking…")
+                .foregroundStyle(.secondary)
+        case .available(let version, _):
+            Text("Latest available: V\(version)")
+            Button("Download & Use") {
+                Task {
+                    if let url = await downloader.download() {
+                        firmwareURL = url
+                        updater.resetPhase()
+                    }
+                }
+            }
+            .disabled(updater.isFlashing)
+        case .downloading(let version):
+            ProgressView()
+                .controlSize(.small)
+            Text("Downloading V\(version)…")
+                .foregroundStyle(.secondary)
+        case .downloaded(let version):
+            Label("Downloaded V\(version)", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.red)
+            Link("Open Downloads Page", destination: FirmwareDownloader.manualDownloadsPage)
+                .font(.caption)
         }
     }
 
