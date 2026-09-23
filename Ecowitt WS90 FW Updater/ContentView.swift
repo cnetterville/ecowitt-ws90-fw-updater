@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @State private var updater = DFUUpdater()
     @State private var downloader = FirmwareDownloader()
+    @State private var appUpdater = AppUpdater()
     @State private var firmwareURL: URL?
     @State private var showingFilePicker = false
     @State private var showingCancelConfirmation = false
@@ -78,10 +79,62 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Licenses…") {
-                showingAcknowledgments = true
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 12) {
+                    Button("Check for Updates…") {
+                        Task { await appUpdater.check() }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(appUpdater.isBusy || updater.isFlashing)
+                    Button("Licenses…") {
+                        showingAcknowledgments = true
+                    }
+                    .buttonStyle(.link)
+                }
+                appUpdateStatus
             }
-            .buttonStyle(.link)
+        }
+    }
+
+    @ViewBuilder
+    private var appUpdateStatus: some View {
+        switch appUpdater.state {
+        case .idle:
+            EmptyView()
+        case .checking:
+            Text("Checking for updates…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .upToDate:
+            Text("You're on the latest version (\(appUpdater.currentVersion)).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .available(let version, _):
+            HStack(spacing: 8) {
+                Text("Version \(version) is available.")
+                    .font(.caption)
+                Button("Install & Relaunch") {
+                    Task { await appUpdater.downloadAndInstall() }
+                }
+                .font(.caption)
+                .disabled(updater.isFlashing)
+            }
+        case .downloading(let version):
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.mini)
+                Text("Downloading version \(version)…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .failed(let message):
+            HStack(spacing: 8) {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Link("Open Releases Page", destination: AppUpdater.releasesPage)
+                    .font(.caption)
+            }
         }
     }
 
