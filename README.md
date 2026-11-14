@@ -1,8 +1,8 @@
-# Ecowitt WS90 FW Updater
+# Ecowitt WS90/WS80 FW Updater
 
-A macOS app for updating [Ecowitt WS90](https://www.ecowitt.com) (and WS80) weather station firmware over USB — no Terminal, no Homebrew, no Windows-only tools.
+A macOS app for updating [Ecowitt WS90 and WS80](https://www.ecowitt.com) weather station firmware over USB — no Terminal, no Homebrew, no Windows-only tools.
 
-![Ecowitt WS90 FW Updater](docs/screenshot.png)
+![Ecowitt WS90/WS80 FW Updater](docs/screenshot.png)
 
 ## Download
 
@@ -11,7 +11,7 @@ Grab the latest signed and notarized build from the [Releases page](https://gith
 ## Features
 
 - **Automatic device detection** — plug the station in and the app finds it, showing its serial number and flash layout.
-- **One-click firmware fetch** — checks Ecowitt's site for the newest published WS90 firmware and downloads it for you; you can also choose a `.dfu` file manually.
+- **One-click firmware fetch** — pick WS90 or WS80, and the app checks Ecowitt's site for that model's newest published firmware and downloads it for you; you can also choose a `.dfu` file manually.
 - **Verify after update** — optionally reads the flash back after writing and compares it byte-for-byte against the firmware file.
 - **Safe by design** — validates firmware files before flashing, prevents your Mac from sleeping mid-update, confirms before canceling, and gives specific recovery guidance if anything fails.
 - **Self-contained** — bundles `dfu-util` and `libusb`, so there's nothing else to install.
@@ -20,7 +20,7 @@ Grab the latest signed and notarized build from the [Releases page](https://gith
 
 1. Remove the silicone cover from the top of the station and connect it to your Mac with a Micro-USB **data** cable (charge-only cables won't work).
 2. Press the **RESET** button — the LED should flash rapidly, indicating DFU mode. The app detects the station within a couple of seconds.
-3. Click **Check Ecowitt for Latest** → **Download & Use**, or **Choose…** to pick a `.dfu` file you downloaded yourself.
+3. Pick your model (**WS90** or **WS80**), then click **Check Ecowitt for Latest** → **Download & Use**, or **Choose…** to pick a `.dfu` file you downloaded yourself.
 4. Click **Update Firmware** and leave the cable alone until it finishes.
 5. Disconnect the cable and press **RESET**. The LED stays on for a few seconds and then turns off — the station is back to normal operation.
 

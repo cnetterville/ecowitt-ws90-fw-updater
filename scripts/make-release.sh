@@ -28,7 +28,7 @@ cd "$(dirname "$0")/.."
 
 PROJECT="Ecowitt WS90 FW Updater.xcodeproj"
 SCHEME="Ecowitt WS90 FW Updater"
-APP_NAME="Ecowitt WS90 FW Updater"
+APP_NAME="Ecowitt WS90-WS80 FW Updater"
 IDENTITY="${SIGNING_IDENTITY:-Developer ID Application}"
 PROFILE="${NOTARY_PROFILE:-AC_NOTARY}"
 BUILD_DIR="build"

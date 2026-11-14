@@ -122,7 +122,7 @@ final class DFUUpdater {
         flashProcess = process
         sleepActivity = ProcessInfo.processInfo.beginActivity(
             options: [.userInitiated, .idleSystemSleepDisabled],
-            reason: "Updating WS90 firmware")
+            reason: "Updating weather station firmware")
 
         Task {
             do {

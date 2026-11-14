@@ -6,7 +6,26 @@
 import Foundation
 import Observation
 
-/// Checks Ecowitt's WS90 product page for the newest published firmware and
+/// The station models this app can fetch firmware for. Both use the same
+/// STM32 DFU bootloader, so the flashing side is identical; only the firmware
+/// image differs.
+enum StationModel: String, CaseIterable, Identifiable {
+    case ws90 = "WS90"
+    case ws80 = "WS80"
+
+    var id: String { rawValue }
+
+    /// Ecowitt's quickstart page for the model (product id 249 is the WS90,
+    /// 46 the WS80).
+    var productPage: URL {
+        switch self {
+        case .ws90: URL(string: "https://www.ecowitt.com/api/quickstart/product?id=249")!
+        case .ws80: URL(string: "https://www.ecowitt.com/api/quickstart/product?id=46")!
+        }
+    }
+}
+
+/// Checks Ecowitt's product page for the newest published firmware and
 /// downloads it. The page is plain server-rendered HTML with direct links to
 /// oss.ecowitt.net; there is no supported API, so parsing is defensive and
 /// failures fall back to pointing the user at the downloads page.
@@ -15,14 +34,12 @@ final class FirmwareDownloader {
     enum State: Equatable {
         case idle
         case checking
-        case available(version: String, url: URL)
-        case downloading(version: String)
-        case downloaded(version: String)
+        case available(model: StationModel, version: String, url: URL)
+        case downloading(model: StationModel, version: String)
+        case downloaded(model: StationModel, version: String)
         case failed(String)
     }
 
-    /// Ecowitt's quickstart page for the WS90 (product id 249).
-    static let productPage = URL(string: "https://www.ecowitt.com/api/quickstart/product?id=249")!
     /// Human-facing downloads page, offered as a fallback when parsing fails.
     static let manualDownloadsPage = URL(string: "https://www.ecowitt.com/support/download/")!
 
@@ -52,35 +69,58 @@ final class FirmwareDownloader {
         }
     }
 
-    /// Fetches the product page and finds the highest-versioned WS90
-    /// firmware zip linked from it (filenames look like "WS90_V1.6.2.zip").
-    func check() async {
+    /// Forgets the result of an earlier check, e.g. when the user picks a
+    /// different model.
+    func reset() {
+        guard !isBusy else { return }
+        state = .idle
+    }
+
+    /// Fetches the model's product page and finds the highest-versioned
+    /// firmware zip for it linked from there.
+    func check(for model: StationModel) async {
         state = .checking
         do {
-            let (data, _) = try await URLSession.shared.data(from: Self.productPage)
+            let (data, _) = try await URLSession.shared.data(from: model.productPage)
             guard let html = String(data: data, encoding: .utf8) else {
                 throw URLError(.cannotDecodeContentData)
             }
-            let matches = html.matches(of: #/href="(https://oss\.ecowitt\.net/uploads/[^"]*WS90[^"]*V([0-9][0-9.]*[0-9])[^"]*\.zip)"/#)
-            guard let best = matches.max(by: { isVersion($0.2, olderThan: $1.2) }) else {
+            guard let best = Self.latestFirmware(in: html, for: model) else {
                 throw DownloadError.pageFormatChanged
             }
-            let href = String(best.1).replacingOccurrences(of: " ", with: "%20")
-            guard let url = URL(string: href) else {
-                throw DownloadError.pageFormatChanged
-            }
-            state = .available(version: String(best.2), url: url)
+            state = .available(model: model, version: best.version, url: best.url)
         } catch {
             state = .failed("Could not check for firmware: \(error.localizedDescription)")
         }
+    }
+
+    /// Finds the highest-versioned firmware zip for `model` among the
+    /// oss.ecowitt.net links in a product page (filenames look like
+    /// "WS90_V1.6.2.zip"). Zips for other models and the Windows toolkit
+    /// archives, which carry no version, are ignored.
+    static func latestFirmware(in html: String, for model: StationModel) -> (version: String, url: URL)? {
+        var best: (version: String, url: URL)?
+        for match in html.matches(of: #/href="(https://oss\.ecowitt\.net/uploads/[^"]*\.zip)"/#) {
+            let href = String(match.1)
+            guard let fileName = href.split(separator: "/").last,
+                  fileName.contains(model.rawValue),
+                  let version = fileName.firstMatch(of: #/V([0-9][0-9.]*[0-9])/#)?.1,
+                  let url = URL(string: href.replacingOccurrences(of: " ", with: "%20")) else {
+                continue
+            }
+            if best == nil || isVersion(best!.version[...], olderThan: version) {
+                best = (String(version), url)
+            }
+        }
+        return best
     }
 
     /// Downloads the zip found by `check()`, extracts it, validates that it
     /// contains a well-formed DfuSe file, and returns the extracted file's
     /// location in Application Support.
     func download() async -> URL? {
-        guard case .available(let version, let url) = state else { return nil }
-        state = .downloading(version: version)
+        guard case .available(let model, let version, let url) = state else { return nil }
+        state = .downloading(model: model, version: version)
         do {
             let (tempZip, _) = try await URLSession.shared.download(from: url)
             let workDir = FileManager.default.temporaryDirectory
@@ -105,7 +145,7 @@ final class FirmwareDownloader {
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.copyItem(at: dfuURL, to: destination)
 
-            state = .downloaded(version: version)
+            state = .downloaded(model: model, version: version)
             return destination
         } catch {
             state = .failed("Download failed: \(error.localizedDescription)")
@@ -140,7 +180,7 @@ final class FirmwareDownloader {
     }
 
     /// Numeric component-wise comparison, so "1.10.0" beats "1.6.2".
-    private func isVersion(_ a: Substring, olderThan b: Substring) -> Bool {
+    private static func isVersion(_ a: Substring, olderThan b: Substring) -> Bool {
         let av = a.split(separator: ".").map { Int($0) ?? 0 }
         let bv = b.split(separator: ".").map { Int($0) ?? 0 }
         for i in 0..<max(av.count, bv.count) {

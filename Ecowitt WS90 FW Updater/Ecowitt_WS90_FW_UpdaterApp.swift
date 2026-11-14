@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct Ecowitt_WS90_FW_UpdaterApp: App {
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("Ecowitt WS90/WS80 FW Updater") {
             ContentView()
         }
     }

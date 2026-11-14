@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var showingCancelConfirmation = false
     @State private var showingAcknowledgments = false
     @AppStorage("verifyAfterUpdate") private var verifyAfterUpdate = true
+    @AppStorage("firmwareModel") private var firmwareModel = StationModel.ws90
 
     private var dfuFileType: UTType {
         UTType(filenameExtension: "dfu") ?? .data
@@ -72,7 +73,7 @@ struct ContentView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.tint)
             VStack(alignment: .leading) {
-                Text("Ecowitt WS90 Firmware Updater")
+                Text("Ecowitt WS90/WS80 Firmware Updater")
                     .font(.title2.bold())
                 Text("Flashes a DfuSe firmware image over USB using dfu-util")
                     .font(.subheadline)
@@ -150,8 +151,8 @@ struct ContentView: View {
                 )
                 statusRow(
                     ok: updater.deviceDetected,
-                    okText: "WS90 detected in DFU mode — serial \(updater.deviceInfo?.serial ?? "")",
-                    failText: "No WS90 detected — connect it with a USB data cable and press RESET (LED should flash rapidly)"
+                    okText: "Station detected in DFU mode — serial \(updater.deviceInfo?.serial ?? "")",
+                    failText: "No WS90 or WS80 detected — connect it with a USB data cable and press RESET (LED should flash rapidly)"
                 )
                 if let info = updater.deviceInfo, !info.flashLayout.isEmpty {
                     Text(info.flashLayout)
@@ -185,8 +186,20 @@ struct ContentView: View {
                     .disabled(updater.isFlashing)
                 }
                 HStack(spacing: 8) {
+                    Picker("Station model", selection: $firmwareModel) {
+                        ForEach(StationModel.allCases) { model in
+                            Text(model.rawValue).tag(model)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    .disabled(updater.isFlashing || downloader.isBusy)
+                    .onChange(of: firmwareModel) {
+                        downloader.reset()
+                    }
                     Button("Check Ecowitt for Latest") {
-                        Task { await downloader.check() }
+                        Task { await downloader.check(for: firmwareModel) }
                     }
                     .disabled(updater.isFlashing || downloader.isBusy)
                     onlineFirmwareStatus
@@ -209,8 +222,8 @@ struct ContentView: View {
                 .controlSize(.small)
             Text("Checking…")
                 .foregroundStyle(.secondary)
-        case .available(let version, _):
-            Text("Latest available: V\(version)")
+        case .available(let model, let version, _):
+            Text("Latest \(model.rawValue): V\(version)")
             Button("Download & Use") {
                 Task {
                     if let url = await downloader.download() {
@@ -220,13 +233,13 @@ struct ContentView: View {
                 }
             }
             .disabled(updater.isFlashing)
-        case .downloading(let version):
+        case .downloading(let model, let version):
             ProgressView()
                 .controlSize(.small)
-            Text("Downloading V\(version)…")
+            Text("Downloading \(model.rawValue) V\(version)…")
                 .foregroundStyle(.secondary)
-        case .downloaded(let version):
-            Label("Downloaded V\(version)", systemImage: "checkmark.circle.fill")
+        case .downloaded(let model, let version):
+            Label("Downloaded \(model.rawValue) V\(version)", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .failed(let message):
             Text(message)
